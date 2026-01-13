@@ -1,41 +1,53 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
+import { Navbar } from "@/components/navbar";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
-import { Navbar } from "@/components/navbar"
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof createClient
+  > | null>(null);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    setSupabase(createClient());
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+    e.preventDefault();
+    if (!supabase) return;
+
+    setError("");
+    setLoading(true);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      router.push("/dashboard")
+      router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Failed to login")
+      setError(err.message || "Failed to login");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  if (!supabase) return null;
 
   return (
     <>
@@ -43,12 +55,19 @@ export default function LoginPage() {
       <main className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
-            <h1 className="text-3xl font-bold text-foreground mb-2 text-center">Welcome Back</h1>
-            <p className="text-muted-foreground text-center mb-8">Sign in to your CS Learning Hub account</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2 text-center">
+              Welcome Back
+            </h1>
+            <p className="text-muted-foreground text-center mb-8">
+              Sign in to your CS Learning Hub account
+            </p>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
                   Email Address
                 </label>
                 <input
@@ -63,7 +82,10 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
                   Password
                 </label>
                 <input
@@ -94,7 +116,10 @@ export default function LoginPage() {
 
             <p className="text-center text-muted-foreground text-sm mt-6">
               Don't have an account?{" "}
-              <Link href="/signup" className="text-primary hover:underline font-medium">
+              <Link
+                href="/signup"
+                className="text-primary hover:underline font-medium"
+              >
                 Sign Up
               </Link>
             </p>
@@ -102,5 +127,5 @@ export default function LoginPage() {
         </div>
       </main>
     </>
-  )
+  );
 }
