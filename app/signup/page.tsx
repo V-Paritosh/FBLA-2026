@@ -1,65 +1,73 @@
-"use client"
+"use client";
 
-import type React from "react"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
+import { Navbar } from "@/components/navbar";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
-import { Navbar } from "@/components/navbar"
+export const dynamic = "force-dynamic"; // <-- important
 
 export default function SignupPage() {
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof createClient
+  > | null>(null);
+
+  const router = useRouter();
+
+  // Only create Supabase client on the client side
+  useEffect(() => {
+    setSupabase(createClient());
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+    e.preventDefault();
+    if (!supabase) return;
+    setError("");
 
     if (!agreedToTerms) {
-      setError("Please agree to the terms and conditions")
-      return
+      setError("Please agree to the terms and conditions");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
       const { error: signupError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
-          data: {
-            name,
-          },
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            window.location.origin,
+          data: { name },
         },
-      })
+      });
 
-      if (signupError) throw signupError
+      if (signupError) throw signupError;
 
       // Store user profile in MongoDB via server action
       await fetch("/api/auth/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          name,
-        }),
-      })
+        body: JSON.stringify({ email, name }),
+      });
 
-      router.push("/onboarding")
+      router.push("/onboarding");
     } catch (err: any) {
-      setError(err.message || "Failed to sign up")
+      setError(err.message || "Failed to sign up");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  if (!supabase) return null; // wait for client side
 
   return (
     <>
@@ -67,14 +75,19 @@ export default function SignupPage() {
       <main className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
-            <h1 className="text-3xl font-bold text-foreground mb-2 text-center">Get Started</h1>
+            <h1 className="text-3xl font-bold text-foreground mb-2 text-center">
+              Get Started
+            </h1>
             <p className="text-muted-foreground text-center mb-8">
               Join a community of students learning and growing together
             </p>
 
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
                   Full Name
                 </label>
                 <input
@@ -89,7 +102,10 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
                   Email Address
                 </label>
                 <input
@@ -104,7 +120,10 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
                   Password
                 </label>
                 <input
@@ -147,7 +166,10 @@ export default function SignupPage() {
 
             <p className="text-center text-muted-foreground text-sm mt-6">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline font-medium">
+              <Link
+                href="/login"
+                className="text-primary hover:underline font-medium"
+              >
                 Sign In
               </Link>
             </p>
@@ -155,5 +177,5 @@ export default function SignupPage() {
         </div>
       </main>
     </>
-  )
+  );
 }
