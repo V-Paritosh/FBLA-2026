@@ -6,9 +6,9 @@ import { getSupabaseUser } from "@/lib/auth";
  * In a real app you'd back this with a DB role/claim.
  */
 function isAdminEmail(email: string | null | undefined): boolean {
-  const adminEmails =
-    process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ??
-    ["admin@cshub.dev"];
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) =>
+    e.trim()
+  ) ?? ["admin@codenode.dev"];
   return !!email && adminEmails.includes(email);
 }
 

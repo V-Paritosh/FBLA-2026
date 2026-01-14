@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSupabaseUser } from "@/lib/auth";
 
 function isAdminEmail(email: string | null | undefined): boolean {
-  const adminEmails =
-    process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ??
-    ["admin@cshub.dev"];
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) =>
+    e.trim()
+  ) ?? ["admin@codenode.dev"];
   return !!email && adminEmails.includes(email);
 }
 
@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest) {
     const users = [
       {
         _id: "user1",
-        email: "student1@cshub.dev",
+        email: "student1@codenode.dev",
         name: "Alex Chen",
         isAdmin: false,
         createdAt: new Date(
@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest) {
       },
       {
         _id: "user2",
-        email: "student2@cshub.dev",
+        email: "student2@codenode.dev",
         name: "Jordan Smith",
         isAdmin: false,
         createdAt: new Date(
@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest) {
       },
       {
         _id: "user3",
-        email: "mentor@cshub.dev",
+        email: "mentor@codenode.dev",
         name: "Casey Rodriguez",
         isAdmin: true,
         createdAt: new Date(

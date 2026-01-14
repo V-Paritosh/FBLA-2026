@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Github,
-  Twitter,
-  Mail,
-} from "lucide-react";
+import { Github, Twitter, Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -18,7 +14,7 @@ export function Footer() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-foreground font-bold">CS</span>
               </div>
-              <span className="font-bold text-lg">CS Hub</span>
+              <span className="font-bold text-lg">CodeNode</span>
             </div>
             <p className="text-sm text-muted-foreground">
               Made by students for students to learn and grow together
@@ -106,7 +102,7 @@ export function Footer() {
                 <Twitter className="w-4 h-4" />
               </a>
               <a
-                href="mailto:hello@cshub.dev"
+                href="mailto:hello@codenode.dev"
                 className="p-2 bg-muted hover:bg-primary hover:text-primary-foreground rounded-lg transition-colors"
                 aria-label="Email"
               >

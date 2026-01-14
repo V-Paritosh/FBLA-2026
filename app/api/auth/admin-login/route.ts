@@ -8,16 +8,13 @@ export async function POST(request: NextRequest) {
     };
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     // In production, verify with Supabase and check MongoDB for admin flag.
-    const adminEmails =
-      process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ??
-      ["admin@cshub.dev"];
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) =>
+      e.trim()
+    ) ?? ["admin@codenode.dev"];
     const isAdmin = adminEmails.includes(email);
 
     if (!isAdmin) {

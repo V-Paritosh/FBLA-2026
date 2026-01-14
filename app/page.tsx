@@ -95,7 +95,7 @@ const testimonials = [
     name: "Alex Chen",
     role: "Student",
     quote:
-      "CS Hub helped me ace my CS fundamentals course. The structured learning path is amazing!",
+      "CodeNode helped me ace my CS fundamentals course. The structured learning path is amazing!",
     avatar: "AC",
   },
   {
@@ -394,7 +394,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl font-bold text-foreground text-center mb-12">
-              Why Choose CS Hub?
+              Why Choose CodeNode?
             </h2>
             <div className="grid md:grid-cols-2 gap-8">
               {features.map((feature, index) => {

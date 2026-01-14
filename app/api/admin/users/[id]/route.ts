@@ -4,9 +4,9 @@ import { getSupabaseUser } from "@/lib/auth";
 type RouteParams = { params: { id: string } };
 
 function isAdminEmail(email: string | null | undefined): boolean {
-  const adminEmails =
-    process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ??
-    ["admin@cshub.dev"];
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) =>
+    e.trim()
+  ) ?? ["admin@codenode.dev"];
   return !!email && adminEmails.includes(email);
 }
 

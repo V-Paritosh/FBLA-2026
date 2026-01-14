@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSupabaseUser } from "@/lib/auth";
 
 function isAdminEmail(email: string | null | undefined): boolean {
-  const adminEmails =
-    process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ??
-    ["admin@cshub.dev"];
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e) =>
+    e.trim()
+  ) ?? ["admin@codenode.dev"];
   return !!email && adminEmails.includes(email);
 }
 
