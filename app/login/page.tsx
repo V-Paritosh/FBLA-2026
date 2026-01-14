@@ -1,10 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { signIn } from "@/lib/auth-client";
 import { Navbar } from "@/components/navbar";
 
 export const dynamic = "force-dynamic";
@@ -14,28 +14,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [supabase, setSupabase] = useState<ReturnType<
-    typeof createClient
-  > | null>(null);
 
   const router = useRouter();
 
-  useEffect(() => {
-    setSupabase(createClient());
-  }, []);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
-
     setError("");
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Use the helper function from lib/auth.ts
+      const { error } = await signIn(email, password);
 
       if (error) throw error;
 
@@ -46,8 +35,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  if (!supabase) return null;
 
   return (
     <>

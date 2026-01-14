@@ -1,34 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { signUp } from "@/lib/auth-client";
 import { Navbar } from "@/components/navbar";
 
-export const dynamic = "force-dynamic"; // <-- important
+export const dynamic = "force-dynamic";
 
 export default function SignupPage() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [supabase, setSupabase] = useState<ReturnType<
-    typeof createClient
-  > | null>(null);
 
   const router = useRouter();
 
-  // Only create Supabase client on the client side
-  useEffect(() => {
-    setSupabase(createClient());
-  }, []);
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
     setError("");
 
     if (!agreedToTerms) {
@@ -39,24 +31,24 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const { error: signupError } = await supabase.auth.signUp({
+      // 1. Call Supabase Sign Up via your helper
+      // Note: We removed graduationYear from args as it wasn't in your form,
+      // but you can add it back if needed.
+      const { error: signupError } = await signUp(
         email,
         password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            window.location.origin,
-          data: { name },
-        },
-      });
+        firstName,
+        lastName
+      );
 
       if (signupError) throw signupError;
 
-      // Store user profile in MongoDB via server action
+      // 2. Store user profile in MongoDB via server action (Optional)
+      // Only keep this if you are actually using MongoDB alongside Supabase
       await fetch("/api/auth/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
+        body: JSON.stringify({ email, firstName, lastName }),
       });
 
       router.push("/onboarding");
@@ -66,8 +58,6 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
-
-  if (!supabase) return null; // wait for client side
 
   return (
     <>
@@ -83,22 +73,41 @@ export default function SignupPage() {
             </p>
 
             <form onSubmit={handleSignup} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium text-foreground mb-2"
-                >
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  required
-                  className="w-full px-4 py-2 rounded-lg border border-input bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="firstName"
+                    className="block text-sm font-medium text-foreground mb-2"
+                  >
+                    First Name
+                  </label>
+                  <input
+                    id="firstName"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Jane"
+                    required
+                    className="w-full px-4 py-2 rounded-lg border border-input bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="lastName"
+                    className="block text-sm font-medium text-foreground mb-2"
+                  >
+                    Last Name
+                  </label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Doe"
+                    required
+                    className="w-full px-4 py-2 rounded-lg border border-input bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
 
               <div>
