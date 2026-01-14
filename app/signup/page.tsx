@@ -31,10 +31,8 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // 1. Call Supabase Sign Up via your helper
-      // Note: We removed graduationYear from args as it wasn't in your form,
-      // but you can add it back if needed.
-      const { error: signupError } = await signUp(
+      // 1. Call Supabase Sign Up and CAPTURE DATA
+      const { data, error: signupError } = await signUp(
         email,
         password,
         firstName,
@@ -43,13 +41,27 @@ export default function SignupPage() {
 
       if (signupError) throw signupError;
 
-      // 2. Store user profile in MongoDB via server action (Optional)
-      // Only keep this if you are actually using MongoDB alongside Supabase
-      await fetch("/api/auth/create-user", {
+      // Safety check to ensure user was created
+      if (!data.user?.id) {
+        throw new Error("Account created but ID missing.");
+      }
+
+      // 2. Store user profile in MongoDB (Pass firstName, lastName, AND userId)
+      const res = await fetch("/api/auth/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, firstName, lastName }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          userId: data.user.id, // <--- CRITICAL: Link Mongo to Supabase
+        }),
       });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Failed to create profile");
+      }
 
       router.push("/onboarding");
     } catch (err: any) {
