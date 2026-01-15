@@ -78,7 +78,7 @@ export function UploadArea({ projectId, initialFiles = [] }: UploadAreaProps) {
       formData.append("projectId", projectId);
 
       try {
-        const response = await fetch("/api/uploads", {
+        const response = await fetch("/api/uploads/projects", {
           method: "POST",
           body: formData,
         });

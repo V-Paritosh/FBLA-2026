@@ -2,12 +2,29 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/lib/mongo";
 import { getSupabaseUser } from "@/lib/auth";
 import type { Project, Module } from "@/lib/types";
+import { createClient } from "@supabase/supabase-js";
+import { ObjectId } from "mongodb";
 
-// Correct Type: params is a Promise that resolves to an object containing id
+// --- Fix: Define the Upload interface locally ---
+interface UploadDoc {
+  _id: ObjectId;
+  projectId: string;
+  storagePath: string; // This fixes the specific error you saw
+  user_id: string;
+  fileName: string;
+}
+
+// Initialize Supabase Client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 type RouteProps = {
   params: Promise<{ id: string }>;
 };
 
+// --- GET (Preserved) ---
 export async function GET(_req: NextRequest, props: RouteProps) {
   try {
     const user = await getSupabaseUser();
@@ -17,7 +34,6 @@ export async function GET(_req: NextRequest, props: RouteProps) {
     const { id: projectId } = await props.params;
     const projectsCollection = await getCollection<Project>("projects");
 
-    // 1. Fetch the Project
     const projectRaw = await projectsCollection.findOne({
       $or: [{ id: projectId }, { _id: projectId }],
     });
@@ -26,18 +42,14 @@ export async function GET(_req: NextRequest, props: RouteProps) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // 2. Fetch the Uploads for this Project (NEW CODE)
     const uploadsCollection = await getCollection("uploads");
-    // We search for uploads where projectId matches the current ID
     const projectUploads = await uploadsCollection
       .find({ projectId: projectId })
       .toArray();
 
-    // 3. Combine them
     const normalized = {
       ...projectRaw,
       modules: projectRaw.modules || [],
-      // Attach the uploads to the response
       uploads: projectUploads || [],
     };
 
@@ -51,13 +63,13 @@ export async function GET(_req: NextRequest, props: RouteProps) {
   }
 }
 
+// --- PATCH (Preserved) ---
 export async function PATCH(req: NextRequest, props: RouteProps) {
   try {
     const user = await getSupabaseUser();
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Await params
     const { id: projectId } = await props.params;
 
     const projectsCollection = await getCollection<Project>("projects");
@@ -101,16 +113,59 @@ export async function PATCH(req: NextRequest, props: RouteProps) {
   }
 }
 
+// --- DELETE (Updated & Fixed) ---
 export async function DELETE(_req: NextRequest, props: RouteProps) {
   try {
     const user = await getSupabaseUser();
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Await params
     const { id: projectId } = await props.params;
 
     const projectsCollection = await getCollection<Project>("projects");
+
+    // Fix: Add <UploadDoc> generic so TypeScript knows storagePath exists
+    const uploadsCollection = await getCollection<UploadDoc>("uploads");
+
+    // 1. Verify Project Ownership
+    const project = await projectsCollection.findOne({
+      $and: [
+        { $or: [{ id: projectId }, { _id: projectId }] },
+        { user_id: user.id },
+      ],
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { error: "Project not found or access denied" },
+        { status: 404 }
+      );
+    }
+
+    // 2. Find all files associated with this project
+    const projectFiles = await uploadsCollection
+      .find({ projectId: projectId })
+      .toArray();
+
+    // 3. Delete from Supabase Storage
+    const storagePaths = projectFiles
+      .map((file) => file.storagePath) // TypeScript is happy now!
+      .filter((path) => typeof path === "string" && path.length > 0);
+
+    if (storagePaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from("project-files")
+        .remove(storagePaths);
+
+      if (storageError) {
+        console.error("Failed to cleanup Supabase files:", storageError);
+      }
+    }
+
+    // 4. Delete file records from MongoDB
+    await uploadsCollection.deleteMany({ projectId: projectId });
+
+    // 5. Delete the Project
     const deleteResult = await projectsCollection.deleteOne({
       $or: [{ id: projectId }, { _id: projectId }],
     });
