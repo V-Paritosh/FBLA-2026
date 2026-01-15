@@ -1,3 +1,5 @@
+import { ObjectId } from "mongodb";
+
 export interface Project {
   // Mongo's own ObjectId (not used directly in the app)
   _id?: string;
@@ -32,13 +34,13 @@ export interface User {
 }
 
 export interface Session {
-  _id?: string
-  user_id: string
-  subject: string
-  description: string
-  host_user_id: string
-  date: Date
-  createdAt: Date
+  _id?: ObjectId | string;
+  user_id: string;
+  subject: string;
+  description: string;
+  host_user_id: string;
+  date: Date;
+  createdAt: Date;
 }
 
 export interface Activity {
