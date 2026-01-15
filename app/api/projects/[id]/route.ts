@@ -14,26 +14,31 @@ export async function GET(_req: NextRequest, props: RouteProps) {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // 1. Await the params object
     const { id: projectId } = await props.params;
-
     const projectsCollection = await getCollection<Project>("projects");
 
-    // 2. Query using the extracted ID
+    // 1. Fetch the Project
     const projectRaw = await projectsCollection.findOne({
       $or: [{ id: projectId }, { _id: projectId }],
     });
 
     if (!projectRaw) {
-      return NextResponse.json(
-        { error: "Project not found", requestedId: projectId },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const normalized: Project = {
+    // 2. Fetch the Uploads for this Project (NEW CODE)
+    const uploadsCollection = await getCollection("uploads");
+    // We search for uploads where projectId matches the current ID
+    const projectUploads = await uploadsCollection
+      .find({ projectId: projectId })
+      .toArray();
+
+    // 3. Combine them
+    const normalized = {
       ...projectRaw,
       modules: projectRaw.modules || [],
+      // Attach the uploads to the response
+      uploads: projectUploads || [],
     };
 
     return NextResponse.json(normalized, { status: 200 });

@@ -1,126 +1,239 @@
-"use client"
+"use client";
 
-import type React from "react"
+import { useState, useEffect } from "react";
+import { Upload, File, Trash2, ExternalLink, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-import { useState, useRef } from "react"
-import { Upload, File, X } from "lucide-react"
-
-interface UploadAreaProps {
-  projectId: string
+interface UploadedFile {
+  _id: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
 }
 
-export function UploadArea({ projectId }: UploadAreaProps) {
-  const [dragActive, setDragActive] = useState(false)
-  const [uploads, setUploads] = useState<File[]>([])
-  const inputRef = useRef<HTMLInputElement>(null)
+interface UploadAreaProps {
+  projectId: string;
+  initialFiles?: UploadedFile[];
+}
+
+export function UploadArea({ projectId, initialFiles = [] }: UploadAreaProps) {
+  const router = useRouter();
+
+  // Local state for the file list
+  const [files, setFiles] = useState<UploadedFile[]>(initialFiles);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // 1. AUTO-REFRESH: Sync local state when server data changes (e.g., after upload)
+  useEffect(() => {
+    setFiles(initialFiles);
+  }, [initialFiles]);
 
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
+      setDragActive(true);
     } else if (e.type === "dragleave") {
-      setDragActive(false)
+      setDragActive(false);
     }
-  }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(Array.from(e.dataTransfer.files));
+    }
+  };
 
-    const files = Array.from(e.dataTransfer.files)
-    handleFiles(files)
-  }
+  const handleFiles = async (newFiles: File[]) => {
+    // 1. LIMIT CHECK: Define limit (50MB in bytes)
+    const MAX_SIZE_MB = 50;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
-  const handleFiles = (files: File[]) => {
-    const validFiles = files.filter((f) => {
-      // Only allow files < 10MB
-      return f.size < 10 * 1024 * 1024
-    })
+    // Filter files and warn user
+    const validFiles = newFiles.filter((file) => {
+      if (file.size > MAX_SIZE_BYTES) {
+        alert(
+          `File "${file.name}" is too large. Max size is ${MAX_SIZE_MB}MB.`
+        );
+        return false;
+      }
+      return true;
+    });
 
-    setUploads((prev) => [...prev, ...validFiles])
+    if (validFiles.length === 0) return;
 
-    // Upload files
-    validFiles.forEach((file) => {
-      uploadFile(file)
-    })
-  }
+    setUploading(true);
 
-  const uploadFile = async (file: File) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("projectId", projectId)
+    const successfulUploads: UploadedFile[] = [];
+
+    // Use 'validFiles' instead of 'newFiles'
+    for (const file of validFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("projectId", projectId);
+
+      try {
+        const response = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const newFile: UploadedFile = await response.json();
+          successfulUploads.push(newFile);
+        } else {
+          // Handle server-side size errors that might slip through
+          const errorData = await response.json().catch(() => ({}));
+          alert(
+            `Upload failed for ${file.name}: ${
+              errorData.error || "Unknown error"
+            }`
+          );
+        }
+      } catch (error) {
+        console.error("Upload error", error);
+      }
+    }
+
+    setUploading(false);
+
+    if (successfulUploads.length > 0) {
+      setFiles((prev) => [...prev, ...successfulUploads]);
+    }
+
+    router.refresh();
+  };
+
+  const removeFile = async (uploadId: string) => {
+    if (!confirm("Are you sure you want to delete this file?")) return;
+
+    // Optimistic UI: Remove immediately from view
+    const previousFiles = [...files];
+    setFiles((prev) => prev.filter((f) => f._id !== uploadId));
+    setDeletingId(uploadId);
 
     try {
-      await fetch("/api/uploads", {
-        method: "POST",
-        body: formData,
-      })
-    } catch (error) {
-      console.error("Upload failed:", error)
-    }
-  }
+      const response = await fetch(`/api/uploads/${uploadId}`, {
+        method: "DELETE",
+      });
 
-  const removeUpload = (index: number) => {
-    setUploads((prev) => prev.filter((_, i) => i !== index))
-  }
+      if (!response.ok) throw new Error("Failed to delete");
+
+      router.refresh(); // Sync with server
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      alert("Could not delete file.");
+      setFiles(previousFiles); // Revert on error
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Drag Drop Area */}
-      <div
+      {/* 3. CLICKABLE AREA: Changed 'div' to 'label' and added 'cursor-pointer' */}
+      <label
+        htmlFor="file-upload"
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          dragActive ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+        className={`group flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+          dragActive
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary/50 hover:bg-muted/50"
         }`}
       >
         <input
-          ref={inputRef}
           type="file"
-          multiple
-          onChange={(e) => handleFiles(Array.from(e.target.files || []))}
           className="hidden"
-          accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.zip"
+          id="file-upload"
+          multiple
+          onChange={(e) =>
+            e.target.files && handleFiles(Array.from(e.target.files))
+          }
         />
 
-        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-        <h3 className="font-semibold text-foreground mb-1">Drag files here or click to upload</h3>
-        <p className="text-sm text-muted-foreground">PDFs, images, documents up to 10MB</p>
+        {uploading ? (
+          <div className="flex flex-col items-center justify-center py-2">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+            <p className="text-sm text-muted-foreground">Uploading...</p>
+          </div>
+        ) : (
+          <>
+            <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2 group-hover:text-primary transition-colors" />
+            <p className="text-sm font-medium">
+              Drag files here or click to upload
+            </p>
+            <span className="mt-2 text-xs text-primary group-hover:underline">
+              Browse computer
+            </span>
+          </>
+        )}
+      </label>
 
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg transition-colors"
-        >
-          <Upload className="w-4 h-4" />
-          Select Files
-        </button>
-      </div>
+      {/* File List */}
+      <div className="space-y-2">
+        {files.length === 0 && !uploading && (
+          <p className="text-xs text-muted-foreground text-center">
+            No files yet.
+          </p>
+        )}
 
-      {/* Uploads List */}
-      {uploads.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-4 space-y-2">
-          <h4 className="text-sm font-medium text-foreground">Recent uploads</h4>
-          {uploads.map((file, index) => (
-            <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <File className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground truncate">{file.name}</span>
+        {files.map((file) => (
+          <div
+            key={file._id}
+            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border group"
+          >
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="bg-background p-2 rounded-md border border-border">
+                <File className="w-4 h-4 text-blue-500" />
               </div>
-              <button
-                onClick={() => removeUpload(index)}
-                className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0 ml-2"
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-medium truncate max-w-[150px]">
+                  {file.fileName}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {(file.fileSize / 1024).toFixed(1)} KB
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <a
+                href={file.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="View File"
+                className="p-2 text-muted-foreground hover:text-primary transition-colors"
               >
-                <X className="w-4 h-4" />
+                <ExternalLink className="w-4 h-4" />
+              </a>
+
+              <button
+                onClick={(e) => {
+                  e.preventDefault(); // Prevent label click bubbling if inside
+                  removeFile(file._id);
+                }}
+                disabled={deletingId === file._id}
+                title="Delete File"
+                className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+              >
+                {deletingId === file._id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
               </button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
-  )
+  );
 }

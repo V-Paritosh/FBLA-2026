@@ -34,6 +34,13 @@ interface Project {
   description: string;
   modules: Module[];
   createdAt: Date;
+  // ADD THIS:
+  uploads?: {
+    _id: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number;
+  }[];
 }
 
 export default function ProjectDetailPage() {
@@ -432,7 +439,11 @@ export default function ProjectDetailPage() {
                   <h3 className="font-semibold text-foreground mb-4">
                     Project Files
                   </h3>
-                  <UploadArea projectId={projectId} />
+                  {/* Pass the uploads from the project object */}
+                  <UploadArea
+                    projectId={projectId}
+                    initialFiles={project.uploads}
+                  />
                 </div>
 
                 {/* Suggested Actions */}
