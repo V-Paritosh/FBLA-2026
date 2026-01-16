@@ -89,7 +89,6 @@ export default function SchedulePage() {
   const handleJoinToggle = async (session: Session) => {
     if (!currentUserId) return;
 
-    // Prevent joining if session is in the past
     if (new Date(session.date) < new Date()) {
       addNotification("This session has already ended.", "error");
       return;
@@ -98,7 +97,7 @@ export default function SchedulePage() {
     const isJoined = session.attendee_ids.includes(currentUserId);
     const action = isJoined ? "leave" : "join";
 
-    // Optimistic Update
+    // Optimistic Update (UI updates instantly)
     setSessions((prev) =>
       prev.map((s) => {
         if (s._id === session._id) {
@@ -120,12 +119,24 @@ export default function SchedulePage() {
         body: JSON.stringify({ sessionId: session._id, action }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        addNotification(
-          isJoined ? "Left session" : "Joined session!",
-          isJoined ? "info" : "success"
-        );
+        if (isJoined) {
+          // User Left
+          const msg = data.xpDeducted
+            ? `Left session (-${data.xpDeducted} XP)`
+            : "Left session";
+          addNotification(msg, "info");
+        } else {
+          // User Joined
+          const msg = data.xpAwarded
+            ? `Joined session! (+${data.xpAwarded} XP)`
+            : "Joined session!";
+          addNotification(msg, "success");
+        }
       } else {
+        // Revert optimistic update on failure
         fetchSessions();
         addNotification("Failed to update attendance", "error");
       }
@@ -136,15 +147,27 @@ export default function SchedulePage() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm("Are you sure you want to cancel this session?")) return;
+    if (
+      !confirm(
+        "Are you sure you want to cancel this session? You will lose the XP gained from creating it."
+      )
+    )
+      return;
 
     try {
       const response = await fetch(`/api/sessions?id=${sessionId}`, {
         method: "DELETE",
       });
+      const data = await response.json();
+
       if (response.ok) {
-        addNotification("Session cancelled", "success");
         setSessions((prev) => prev.filter((s) => s._id !== sessionId));
+
+        // Show notification with XP deduction
+        const msg = data.xpDeducted
+          ? `Session cancelled (-${data.xpDeducted} XP)`
+          : "Session cancelled";
+        addNotification(msg, "info");
       } else {
         addNotification("Failed to delete", "error");
       }
@@ -256,7 +279,7 @@ export default function SchedulePage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 {/* CALENDAR */}
-                <div className="lg:col-span-4 sticky top-0">
+                <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6 static">
                   <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="font-semibold text-lg">
@@ -604,6 +627,7 @@ export default function SchedulePage() {
             onClose={() => setShowModal(false)}
             onSuccess={fetchSessions}
             initialData={editingSession}
+            addNotification={addNotification}
           />
         )}
       </AnimatePresence>
@@ -611,16 +635,21 @@ export default function SchedulePage() {
   );
 }
 
+// --- Combined Create/Edit Modal ---
 function SessionModal({
   onClose,
   onSuccess,
   initialData,
+  addNotification,
 }: {
   onClose: () => void;
   onSuccess: () => void;
   initialData: Session | null;
+  addNotification: (msg: string, type: "success" | "info" | "error") => void;
 }) {
   const isEditing = !!initialData;
+
+  // Helpers to format date/time for inputs
   const parseDate = (d: string) => new Date(d).toISOString().split("T")[0];
   const parseTime = (d: string) => new Date(d).toTimeString().slice(0, 5);
 
@@ -643,11 +672,12 @@ function SessionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const url = "/api/sessions";
       const method = isEditing ? "PUT" : "POST";
       const body = {
-        id: initialData?._id,
+        id: initialData?._id, // Only used for PUT
         subject,
         description,
         date: `${date}T${time}`,
@@ -661,14 +691,29 @@ function SessionModal({
         body: JSON.stringify(body),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         onSuccess();
         onClose();
+
+        // --- Notification Logic ---
+        if (method === "POST" && data.xpAwarded) {
+          addNotification(
+            `Session Created! (+${data.xpAwarded} XP)`,
+            "success"
+          );
+        } else if (isEditing) {
+          addNotification("Session updated successfully", "success");
+        } else {
+          addNotification("Session created", "success");
+        }
       } else {
-        alert("Failed to save session");
+        addNotification(data.error || "Failed to save session", "error");
       }
     } catch (error) {
       console.error("Error:", error);
+      addNotification("Network error occurred", "error");
     } finally {
       setLoading(false);
     }

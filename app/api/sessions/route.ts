@@ -4,6 +4,12 @@ import { getCollection } from "@/lib/mongo";
 import { ObjectId } from "mongodb";
 import type { Session } from "@/lib/types";
 
+// --- XP Configuration ---
+const XP_RATES = {
+  HOSTING: 50, // XP for creating a session
+  JOINING: 20, // XP for attending a session
+};
+
 // GET: Fetch sessions
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +42,6 @@ export async function GET(request: NextRequest) {
             host_user_id: 1,
             location: 1,
             meeting_link: 1,
-            // We now return the list of user_ids who joined
             attendee_ids: { $ifNull: ["$attendee_ids", []] },
             hostName: { $ifNull: ["$hostDetails.name", "Unknown"] },
           },
@@ -59,7 +64,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Create a session
+// POST: Create a session (Awards XP)
 export async function POST(request: NextRequest) {
   try {
     const user = await getSupabaseUser();
@@ -68,7 +73,9 @@ export async function POST(request: NextRequest) {
 
     const { subject, description, date, location, meeting_link } =
       await request.json();
+
     const sessionsCollection = await getCollection<Session>("sessions");
+    const usersCollection = await getCollection("users");
 
     const newSession = {
       user_id: user.id,
@@ -78,13 +85,24 @@ export async function POST(request: NextRequest) {
       date: new Date(date),
       location: location || "",
       meeting_link: meeting_link || "",
-      attendee_ids: [], // Start with empty attendees
+      attendee_ids: [],
       createdAt: new Date(),
     };
 
     const result = await sessionsCollection.insertOne(newSession as any);
+
+    // --- AWARD XP FOR HOSTING ---
+    await usersCollection.updateOne(
+      { user_id: user.id },
+      { $inc: { xp: XP_RATES.HOSTING } }
+    );
+
     return NextResponse.json(
-      { success: true, sessionId: result.insertedId },
+      {
+        success: true,
+        sessionId: result.insertedId,
+        xpAwarded: XP_RATES.HOSTING,
+      },
       { status: 201 }
     );
   } catch (error) {
@@ -95,7 +113,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT: Edit a session (Only Host)
+// PUT: Edit a session
 export async function PUT(request: NextRequest) {
   try {
     const user = await getSupabaseUser();
@@ -113,7 +131,6 @@ export async function PUT(request: NextRequest) {
 
     const sessionsCollection = await getCollection<Session>("sessions");
 
-    // Update only if the _id matches AND the host is the current user
     const result = await sessionsCollection.updateOne(
       { _id: new ObjectId(id), host_user_id: user.id },
       {
@@ -144,32 +161,55 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// PATCH: Join or Leave a Session
+// PATCH: Join or Leave (Awards or Deducts XP)
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getSupabaseUser();
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { sessionId, action } = await request.json(); // action = 'join' or 'leave'
+    const { sessionId, action } = await request.json();
     const sessionsCollection = await getCollection<Session>("sessions");
+    const usersCollection = await getCollection("users");
 
-    let updateOperation;
+    const currentSession = await sessionsCollection.findOne({
+      _id: new ObjectId(sessionId),
+      attendee_ids: user.id,
+    });
 
     if (action === "join") {
-      // Add user ID to array if not exists
-      updateOperation = { $addToSet: { attendee_ids: user.id } };
+      if (currentSession)
+        return NextResponse.json({ message: "Already joined" });
+
+      await Promise.all([
+        sessionsCollection.updateOne(
+          { _id: new ObjectId(sessionId) },
+          { $addToSet: { attendee_ids: user.id } }
+        ),
+        usersCollection.updateOne(
+          { user_id: user.id },
+          { $inc: { xp: XP_RATES.JOINING } }
+        ),
+      ]);
+
+      return NextResponse.json({ success: true, xpAwarded: XP_RATES.JOINING });
     } else {
-      // Remove user ID from array
-      updateOperation = { $pull: { attendee_ids: user.id } as any };
+      if (!currentSession) return NextResponse.json({ message: "Not joined" });
+
+      await Promise.all([
+        sessionsCollection.updateOne(
+          { _id: new ObjectId(sessionId) },
+          { $pull: { attendee_ids: user.id } as any }
+        ),
+        // DEDUCT XP ON LEAVE
+        usersCollection.updateOne(
+          { user_id: user.id },
+          { $inc: { xp: -XP_RATES.JOINING } }
+        ),
+      ]);
+
+      return NextResponse.json({ success: true, xpDeducted: XP_RATES.JOINING });
     }
-
-    await sessionsCollection.updateOne(
-      { _id: new ObjectId(sessionId) },
-      updateOperation
-    );
-
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Join/Leave error:", error);
     return NextResponse.json(
@@ -179,7 +219,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE: Remove a session
+// DELETE: Remove a session (Deducts XP from Host)
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getSupabaseUser();
@@ -190,15 +230,33 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const sessionsCollection = await getCollection<Session>("sessions");
+    const usersCollection = await getCollection("users");
+
+    // 1. Delete the session
     const result = await sessionsCollection.deleteOne({
       _id: new ObjectId(sessionId!),
       host_user_id: user.id,
     });
 
     if (result.deletedCount === 0)
-      return NextResponse.json({ error: "Error" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Error or Unauthorized" },
+        { status: 404 }
+      );
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    // 2. Deduct XP from the host for cancelling
+    await usersCollection.updateOne(
+      { user_id: user.id },
+      { $inc: { xp: -XP_RATES.HOSTING } }
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        xpDeducted: XP_RATES.HOSTING,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
