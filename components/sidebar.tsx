@@ -1,63 +1,73 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  LayoutGrid,
-  Calendar,
-  BookOpen,
-  Settings,
-  LogOut,
-  X,
-  BarChart3,
-} from "lucide-react";
+import { LayoutGrid, Calendar, BookOpen, Settings, LogOut } from "lucide-react";
 import { useUIStore } from "@/store/ui-store";
+
+// Import from your central auth file
+import { getSession, signOut } from "@/lib/auth-client";
 
 export function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUIStore();
   const router = useRouter();
 
+  // 1. Check Session on Mount
+  useEffect(() => {
+    const checkUser = async () => {
+      const { session, error } = await getSession();
+      // If no session or error, force redirect to landing
+      if (error || !session) {
+        router.push("/");
+      }
+    };
+    checkUser();
+  }, [router]);
+
+  // 2. Updated Logout Logic using your API
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
+    try {
+      await signOut(); // Uses the function from auth-client.ts
+      router.push("/");
+
+      // Close sidebar if on mobile
+      if (window.innerWidth < 1024 && isSidebarOpen) {
+        toggleSidebar();
+      }
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   const navItems = [
     { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
     { icon: Calendar, label: "Schedule", href: "/schedule" },
     { icon: BookOpen, label: "Resources", href: "/resources" },
-    // { icon: BarChart3, label: "Metrics", href: "/metrics" },
     { icon: Settings, label: "Profile", href: "/dashboard/profile" },
   ];
 
   return (
     <>
-      {/* Overlay for mobile */}
+      {/* Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity"
           onClick={toggleSidebar}
         />
       )}
 
       <aside
         className={`
-          fixed left-0 top-16 z-40 w-64 transform border-r border-sidebar-border bg-sidebar transition-transform duration-200 
+          fixed left-0 top-16 z-40 w-64 h-[calc(100vh-4rem)]
+          border-r border-sidebar-border bg-sidebar 
+          transform transition-transform duration-200 ease-in-out
           flex flex-col 
-          h-[calc(100vh-4rem)] 
-          lg:static lg:top-0 lg:h-screen lg:translate-x-0 
+          lg:static lg:h-screen lg:translate-x-0 
           ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Scrollable Navigation Area */}
         <div className="flex-1 overflow-y-auto p-6">
-          <button
-            onClick={toggleSidebar}
-            className="mb-6 rounded-lg p-2 hover:bg-sidebar-accent lg:hidden"
-          >
-            <X className="h-5 w-5" />
-          </button>
-
           <nav className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -65,6 +75,7 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => isSidebarOpen && toggleSidebar()}
                   className="flex items-center gap-3 rounded-lg px-4 py-3 text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
                 >
                   <Icon className="h-5 w-5" />
@@ -75,7 +86,6 @@ export function Sidebar() {
           </nav>
         </div>
 
-        {/* Fixed Bottom Section (Logout) */}
         <div className="border-t border-sidebar-border p-6">
           <button
             onClick={handleLogout}

@@ -14,7 +14,7 @@ export const useUIStore = create<UIStore>((set) => ({
   isModalOpen: false,
   openModal: () => set({ isModalOpen: true }),
   closeModal: () => set({ isModalOpen: false }),
-  isSidebarOpen: true,
+  isSidebarOpen: false,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   openDropdown: null,
   setOpenDropdown: (id) => set({ openDropdown: id }),
