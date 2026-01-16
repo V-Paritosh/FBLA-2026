@@ -170,7 +170,7 @@ export default function LandingPage() {
 
             <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold text-foreground tracking-tight">
               Master Computer
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary pb-6">
                 Science Together
               </span>
             </h1>

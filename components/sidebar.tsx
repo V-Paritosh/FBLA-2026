@@ -25,16 +25,19 @@ export function Sidebar() {
     checkUser();
   }, [router]);
 
-  // 2. Updated Logout Logic using your API
+  // 2. Updated Logout Logic
   const handleLogout = async () => {
     try {
-      await signOut(); // Uses the function from auth-client.ts
-      router.push("/");
+      await signOut();
 
       // Close sidebar if on mobile
       if (window.innerWidth < 1024 && isSidebarOpen) {
         toggleSidebar();
       }
+
+      // FIX: Use window.location.href instead of router.push
+      // This forces a hard refresh to clear client cache and state
+      window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
     }
