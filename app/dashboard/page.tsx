@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Sidebar } from "@/components/sidebar";
+import { StreakNotification } from "@/components/streak-notification";
 import { ProgressRing } from "@/components/progress-ring";
 import { ProjectCard } from "@/components/project-card";
 import { Plus, Flame, Award, BookOpen } from "lucide-react";
@@ -44,11 +45,20 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Fetch projects from API
-        const response = await fetch("/api/projects");
-        const projects = await response.json();
+        // Fetch Projects and Profile concurrently for better performance
+        const [projectsRes, profileRes] = await Promise.all([
+          fetch("/api/projects"),
+          fetch("/api/profile"),
+        ]);
 
-        // Global stats based on all project modules (same logic as project page)
+        if (!projectsRes.ok || !profileRes.ok) {
+          throw new Error("Failed to fetch dashboard data");
+        }
+
+        const projects = await projectsRes.json();
+        const profile = await profileRes.json();
+
+        // Global stats based on all project modules (Calculated locally for the Progress Ring)
         const totalModules = projects.reduce(
           (sum: number, p: Project) => sum + (p.modules?.length || 0),
           0
@@ -64,16 +74,16 @@ export default function DashboardPage() {
             : 0;
 
         setData({
-          userName: "User", // Replace with real user data if available
+          userName: profile.name || "User", // Updated from Profile
           completionPercentage,
           completedModules,
           totalModules,
-          streak: 5, // Example streak, replace with real value if needed
-          xp: completedModules * 10, // Example XP calculation
+          streak: profile.streak || 0, // Updated from Profile
+          xp: profile.xp || 0, // Updated from Profile
           projects,
         });
       } catch (error) {
-        console.error("Failed to fetch dashboard/projects:", error);
+        console.error("Failed to fetch dashboard data:", error);
       } finally {
         setLoading(false);
       }
@@ -97,6 +107,8 @@ export default function DashboardPage() {
               </div>
             ) : data ? (
               <div className="space-y-8">
+                <StreakNotification />
+
                 {/* Welcome Banner */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -128,7 +140,8 @@ export default function DashboardPage() {
                     </div>
                     <ProgressRing percentage={data.completionPercentage} />
                     <p className="mt-3 text-sm text-muted-foreground text-center">
-                      {data.completedModules} of {data.totalModules} modules completed
+                      {data.completedModules} of {data.totalModules} modules
+                      completed
                     </p>
                   </motion.div>
 
@@ -168,7 +181,7 @@ export default function DashboardPage() {
                       {data.xp}
                     </div>
                     <p className="text-muted-foreground text-sm">
-                      earned this month
+                      total earned
                     </p>
                   </motion.div>
                 </div>
@@ -219,56 +232,6 @@ export default function DashboardPage() {
                       </Link>
                     </div>
                   )}
-                </div>
-
-                {/* Recommended Topics */}
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-6">
-                    Recommended For You
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      className="bg-card border border-border rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="font-semibold text-foreground">
-                            Advanced JavaScript
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Based on your web dev interest
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-primary">
-                        View Course →
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      className="bg-card border border-border rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="font-semibold text-foreground">
-                            Data Structures Mastery
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Improve your algorithms skills
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-primary">
-                        View Course →
-                      </div>
-                    </motion.div>
-                  </div>
                 </div>
               </div>
             ) : (
