@@ -749,7 +749,7 @@ function SessionModal({
                 onChange={(e) => setSubject(e.target.value)}
                 required
                 className="w-full px-4 py-2.5 rounded-xl border border-input bg-muted/30 focus:bg-background outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="e.g. Calculus 101"
+                placeholder="e.g. CS 101"
               />
             </div>
             <div className="space-y-1.5">
