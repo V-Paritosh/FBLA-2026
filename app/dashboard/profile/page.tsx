@@ -1,85 +1,114 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Navbar } from "@/components/navbar"
-import { Sidebar } from "@/components/sidebar"
-import { Settings, LogOut, Zap, Award, TrendingUp, Edit2, Save, X, Check } from "lucide-react"
-import { motion } from "framer-motion"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react";
+import { Navbar } from "@/components/navbar";
+import { Sidebar } from "@/components/sidebar";
+import { Settings, Save, Trash2, AlertTriangle } from "lucide-react";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
 interface UserProfile {
-  name: string
-  email: string
-  joinedDate: string
-  xp: number
-  streak: number
-  completedModules: number
-  interests?: string[]
-  experienceLevel?: "beginner" | "intermediate" | "advanced"
-  learningGoals?: string[]
+  firstName: string;
+  lastName: string;
+  email: string;
+  joinedDate: string;
+  xp: number;
+  streak: number;
+  completedModules: number;
+  interests?: string[];
+  experienceLevel?: "beginner" | "intermediate" | "advanced";
+  learningGoals?: string[];
 }
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [editMode, setEditMode] = useState(false)
-  const [editData, setEditData] = useState<Partial<UserProfile>>({})
-  const [saving, setSaving] = useState(false)
-  const router = useRouter()
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<Partial<UserProfile>>({});
+  const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const interests = ["Programming", "Web Dev", "Cybersecurity", "Databases", "Machine Learning", "Algorithms"]
-  const experienceLevels = ["beginner", "intermediate", "advanced"]
-  const goals = [
-    "Build projects",
-    "Learn fundamentals",
-    "Prepare for competitions",
-    "Prepare for AP CSA",
-    "Prep for internship interviews",
-    "Prep for hackathons",
-  ]
+  const router = useRouter();
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch("/api/profile")
-        const data = await response.json()
-        setProfile(data)
-        setEditData(data)
+        const response = await fetch("/api/profile");
+        const data = await response.json();
+        setProfile(data);
+        setEditData(data);
       } catch (error) {
-        console.error("Failed to fetch profile:", error)
+        console.error("Failed to fetch profile:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchProfile()
-  }, [])
+    fetchProfile();
+  }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" })
-    router.push("/")
-  }
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete your account? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch("/api/auth/delete-account", {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete account");
+      }
+
+      await supabase.auth.signOut();
+      router.push("/");
+      router.refresh();
+    } catch (error: any) {
+      console.error("Delete failed:", error);
+      alert(error.message || "Failed to delete account. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSaveChanges = async () => {
-    setSaving(true)
+    setSaving(true);
     try {
-      const response = await fetch("/api/profile/update", {
+      const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editData),
-      })
+      });
 
       if (response.ok) {
-        const updated = await response.json()
-        setProfile(updated)
-        setEditMode(false)
+        const updated = await response.json();
+        setProfile(updated);
+        setEditMode(false);
       }
     } catch (error) {
-      console.error("Failed to save profile:", error)
+      console.error("Failed to save profile:", error);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -92,7 +121,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -103,264 +132,129 @@ export default function ProfilePage() {
         <Navbar />
 
         <main className="flex-1 overflow-auto">
+          {/* Reduced padding on mobile (p-4), larger on desktop (sm:p-8) */}
           <div className="p-4 sm:p-8">
-            <div className="max-w-3xl mx-auto space-y-8">
+            <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
               {/* Profile Header */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl border border-primary/20 p-6"
+                className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl border border-primary/20 p-4 sm:p-6"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-foreground">{profile?.name}</h1>
-                    <p className="text-muted-foreground">{profile?.email}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Member since</p>
-                    <p className="text-foreground font-semibold">{profile?.joinedDate}</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="overflow-hidden w-full">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate">
+                      {profile?.firstName} {profile?.lastName}
+                    </h1>
+                    <p className="text-sm sm:text-base text-muted-foreground truncate">
+                      {profile?.email}
+                    </p>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-6">
+                {/* Account Settings */}
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="bg-card border border-border rounded-lg p-4 text-center"
+                  className="bg-card border border-border rounded-xl p-4 sm:p-6 space-y-4"
                 >
-                  <Zap className="w-6 h-6 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{profile?.xp}</p>
-                  <p className="text-xs text-muted-foreground">Total XP</p>
-                </motion.div>
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-primary" />
+                    Account Settings
+                  </h2>
 
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="bg-card border border-border rounded-lg p-4 text-center"
-                >
-                  <TrendingUp className="w-6 h-6 text-secondary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{profile?.streak}</p>
-                  <p className="text-xs text-muted-foreground">Day Streak</p>
-                </motion.div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Personal Details
+                    </label>
 
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="bg-card border border-border rounded-lg p-4 text-center"
-                >
-                  <Award className="w-6 h-6 text-orange-500 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{profile?.completedModules}</p>
-                  <p className="text-xs text-muted-foreground">Completed</p>
+                    {/* MOBILE FIX: flex-col for mobile, sm:flex-row for desktop */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <input
+                        type="text"
+                        value={editData.firstName || ""}
+                        onChange={(e) =>
+                          setEditData({
+                            ...editData,
+                            firstName: e.target.value,
+                          })
+                        }
+                        className="w-full sm:flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        placeholder="First Name"
+                      />
+                      <input
+                        type="text"
+                        value={editData.lastName || ""}
+                        onChange={(e) =>
+                          setEditData({ ...editData, lastName: e.target.value })
+                        }
+                        className="w-full sm:flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        placeholder="Last Name"
+                      />
+
+                      {/* Save Button - Full width on mobile, auto on desktop */}
+                      <motion.button
+                        onClick={handleSaveChanges}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        disabled={
+                          saving ||
+                          (!editData.firstName && !editData.lastName) ||
+                          (editData.firstName === profile?.firstName &&
+                            editData.lastName === profile?.lastName)
+                        }
+                        className="w-full sm:w-auto flex justify-center items-center p-2.5 bg-blue-700 text-white rounded-lg hover:bg-blue-500 disabled:cursor-not-allowed shadow-md shadow-blue-500/20 transition-all"
+                        title="Save Name"
+                      >
+                        {saving ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          // Added text for mobile since icon alone might be confusing in a full-width button
+                          <span className="flex items-center gap-2">
+                            <Save className="w-4 h-4" />
+                            <span className="sm:hidden">Save Changes</span>
+                          </span>
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
                 </motion.div>
               </div>
-
-              {/* Learning Preferences - Editable */}
-              {!editMode ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-foreground">Learning Preferences</h2>
-                    <motion.button
-                      onClick={() => setEditMode(true)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit
-                    </motion.button>
-                  </div>
-
-                  <div className="bg-card border border-border rounded-lg p-4 space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Your Interests</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(profile?.interests || []).map((interest) => (
-                          <span key={interest} className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm">
-                            {interest}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Experience Level</p>
-                      <p className="px-3 py-1 bg-secondary/20 text-secondary rounded-full text-sm w-fit capitalize">
-                        {profile?.experienceLevel || "Not set"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Learning Goals</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(profile?.learningGoals || []).map((goal) => (
-                          <span key={goal} className="px-3 py-1 bg-orange-500/20 text-orange-600 rounded-full text-sm">
-                            {goal}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4 bg-card border border-border rounded-lg p-6"
-                >
-                  <h2 className="text-xl font-bold text-foreground">Edit Learning Preferences</h2>
-
-                  {/* Interests */}
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-3">Your Interests</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {interests.map((interest) => (
-                        <motion.button
-                          key={interest}
-                          onClick={() => {
-                            const current = editData.interests || []
-                            setEditData({
-                              ...editData,
-                              interests: current.includes(interest)
-                                ? current.filter((i) => i !== interest)
-                                : [...current, interest],
-                            })
-                          }}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-                            (editData.interests || []).includes(interest)
-                              ? "bg-primary/20 border-primary text-primary"
-                              : "bg-muted border-border text-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{interest}</span>
-                            {(editData.interests || []).includes(interest) && <Check className="w-4 h-4" />}
-                          </div>
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Experience Level */}
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-3">Experience Level</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {experienceLevels.map((level) => (
-                        <motion.button
-                          key={level}
-                          onClick={() => setEditData({ ...editData, experienceLevel: level as any })}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`p-3 rounded-lg border-2 transition-all text-sm font-medium capitalize ${
-                            editData.experienceLevel === level
-                              ? "bg-secondary/20 border-secondary text-secondary"
-                              : "bg-muted border-border text-foreground hover:border-secondary/50"
-                          }`}
-                        >
-                          {level}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Learning Goals */}
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-3">Learning Goals</p>
-                    <div className="space-y-2">
-                      {goals.map((goal) => (
-                        <motion.label
-                          key={goal}
-                          whileHover={{ scale: 1.01 }}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={(editData.learningGoals || []).includes(goal)}
-                            onChange={() => {
-                              const current = editData.learningGoals || []
-                              setEditData({
-                                ...editData,
-                                learningGoals: current.includes(goal)
-                                  ? current.filter((g) => g !== goal)
-                                  : [...current, goal],
-                              })
-                            }}
-                            className="w-4 h-4 rounded border-border cursor-pointer"
-                          />
-                          <span className="text-sm text-foreground">{goal}</span>
-                        </motion.label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Save/Cancel Buttons */}
-                  <div className="flex gap-3 pt-4 border-t border-border">
-                    <motion.button
-                      onClick={() => setEditMode(false)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex-1 border-2 border-border text-foreground hover:bg-muted/50 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      onClick={handleSaveChanges}
-                      disabled={saving}
-                      whileHover={!saving ? { scale: 1.02 } : {}}
-                      whileTap={!saving ? { scale: 0.98 } : {}}
-                      className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                    >
-                      <Save className="w-4 h-4" />
-                      {saving ? "Saving..." : "Save Changes"}
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Settings */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="space-y-4"
-              >
-                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Settings
-                </h2>
-
-                {/* Logout */}
-                <button
-                  onClick={handleLogout}
-                  className="w-full bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </button>
-              </motion.div>
 
               {/* Danger Zone */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-3"
+                className="bg-red-900/10 border border-red-500/50 rounded-lg p-4 sm:p-6 space-y-4"
               >
-                <h3 className="font-semibold text-destructive">Danger Zone</h3>
-                <button className="w-full bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 px-4 py-2 rounded-lg transition-colors text-sm font-medium">
-                  Delete Account
+                <div className="flex items-center gap-2 text-red-500">
+                  <AlertTriangle className="w-5 h-5" />
+                  <h3 className="font-semibold">Danger Zone</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Deleting your account is permanent. All your data, XP, and
+                  progress will be wiped out immediately.
+                </p>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isDeleting}
+                  className="w-full bg-red-600 text-white hover:bg-red-700 px-4 py-3 rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Deleting Account...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete Account
+                    </>
+                  )}
                 </button>
               </motion.div>
             </div>
@@ -368,5 +262,5 @@ export default function ProfilePage() {
         </main>
       </div>
     </div>
-  )
+  );
 }
