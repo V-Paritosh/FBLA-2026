@@ -21,16 +21,19 @@ export interface Module {
 }
 
 export interface User {
-  _id?: string
-  user_id: string
-  email: string
-  name: string
-  interests: string[]
-  experienceLevel: "beginner" | "intermediate" | "advanced"
-  learningGoals: string[]
-  streak: number
-  xp: number
-  createdAt: Date
+  _id?: string;
+  user_id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  name: string;
+  interests: string[];
+  experienceLevel: "beginner" | "intermediate" | "advanced";
+  learningGoals: string[];
+  streak: number;
+  xp: number;
+  lastLoginDate?: Date;
+  createdAt: Date;
 }
 
 export interface Session {

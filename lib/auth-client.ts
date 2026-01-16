@@ -8,7 +8,7 @@ const supabase = createBrowserClient(
 
 // ==========================================
 // CLIENT-SIDE ACTIONS
-// Use this in: app/login/page.tsx, app/signup/page.tsx
+// Use this in: app/login/page.tsx, app/signup/page.tsx, components/Sidebar.tsx
 // ==========================================
 
 export async function signUp(
@@ -41,4 +41,10 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+// --- ADDED THIS FUNCTION ---
+export async function getSession() {
+  const { data, error } = await supabase.auth.getSession();
+  return { session: data.session, error };
 }
