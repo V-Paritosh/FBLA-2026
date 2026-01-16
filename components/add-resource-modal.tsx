@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Upload, Link as LinkIcon, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,15 +16,27 @@ const CATEGORIES = [
 interface AddResourceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onResourceAdded: (resource: any) => void;
+  onResourceAdded: (resource: any) => void; // Used for create
+  onResourceUpdated?: (resource: any) => void; // Used for edit
+  initialData?: any; // If present, we are in EDIT mode
+  // Notification Prop
+  onShowNotification: (
+    message: string,
+    type: "success" | "info" | "error"
+  ) => void;
 }
 
 export function AddResourceModal({
   isOpen,
   onClose,
   onResourceAdded,
+  onResourceUpdated,
+  initialData,
+  onShowNotification,
 }: AddResourceModalProps) {
   const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
     title: "",
     type: "lesson",
@@ -32,7 +44,28 @@ export function AddResourceModal({
     difficulty: "Beginner",
     link: "",
   });
-  const [file, setFile] = useState<File | null>(null);
+
+  // Load initial data if editing
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        title: initialData.title,
+        type: initialData.type,
+        category: initialData.category,
+        difficulty: initialData.difficulty,
+        link: initialData.url,
+      });
+    } else {
+      // Reset defaults
+      setFormData({
+        title: "",
+        type: "lesson",
+        category: "Programming",
+        difficulty: "Beginner",
+        link: "",
+      });
+    }
+  }, [initialData, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +79,11 @@ export function AddResourceModal({
         const uploadForm = new FormData();
         uploadForm.append("file", file);
 
-        // POINTING TO YOUR NEW ROUTE HERE:
+        // IF we are editing, send the old URL so the server can delete it
+        if (initialData?.url) {
+          uploadForm.append("oldUrl", initialData.url);
+        }
+
         const uploadRes = await fetch("/api/uploads/resources", {
           method: "POST",
           body: uploadForm,
@@ -58,40 +95,58 @@ export function AddResourceModal({
         }
 
         const data = await uploadRes.json();
-        finalUrl = data.url; // Capture the Supabase URL
+        finalUrl = data.url;
       }
 
-      // 2. Save Resource Metadata (To MongoDB via your resources API)
-      const res = await fetch("/api/resources", {
-        method: "POST",
+      // 2. Determine Method and Endpoint
+      const isEdit = !!initialData;
+      const url = "/api/resources";
+      const method = isEdit ? "PUT" : "POST";
+
+      const body = {
+        id: initialData?._id, // Only needed for PUT
+        title: formData.title,
+        type: formData.type,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        url: finalUrl,
+      };
+
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: formData.title,
-          type: formData.type,
-          category: formData.category,
-          difficulty: formData.difficulty,
-          url: finalUrl, // This is either the User's link OR the Supabase URL
-        }),
+        body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error("Failed to create resource");
+      if (!res.ok) throw new Error("Failed to save resource");
 
-      const newResource = await res.json();
-      onResourceAdded(newResource);
+      const savedData = await res.json();
+
+      if (isEdit && onResourceUpdated) {
+        onResourceUpdated({ ...initialData, ...body }); // Optimistic update
+        onShowNotification("Resource updated successfully", "success");
+      } else {
+        onResourceAdded(savedData);
+        // Emojis removed
+        onShowNotification("Resource added. You gained 25 XP.", "success");
+      }
+
       onClose();
-
-      // Reset form...
-      setFormData({
-        title: "",
-        type: "lesson",
-        category: "Programming",
-        difficulty: "Beginner",
-        link: "",
-      });
       setFile(null);
+
+      // Reset form if not editing so next add is clean
+      if (!isEdit) {
+        setFormData({
+          title: "",
+          type: "lesson",
+          category: "Programming",
+          difficulty: "Beginner",
+          link: "",
+        });
+      }
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Something went wrong");
+      onShowNotification(error.message || "Something went wrong", "error");
     } finally {
       setLoading(false);
     }
@@ -108,13 +163,16 @@ export function AddResourceModal({
             className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden"
           >
             <div className="p-6 border-b border-border flex justify-between items-center">
-              <h2 className="text-xl font-bold">Add Resource (+25 XP)</h2>
+              <h2 className="text-xl font-bold">
+                {initialData ? "Edit Resource" : "Add Resource (+25 XP)"}
+              </h2>
               <button onClick={onClose}>
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Title */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Title</label>
                 <input
@@ -127,6 +185,7 @@ export function AddResourceModal({
                 />
               </div>
 
+              {/* Type & Category */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Type</label>
@@ -163,6 +222,7 @@ export function AddResourceModal({
                 </div>
               </div>
 
+              {/* Difficulty */}
               <div>
                 <label className="text-sm font-medium mb-1 block">
                   Difficulty
@@ -180,6 +240,7 @@ export function AddResourceModal({
                 </select>
               </div>
 
+              {/* File or Link */}
               {formData.type === "cheatsheet" ? (
                 <div>
                   <label className="text-sm font-medium mb-1 block">
@@ -189,13 +250,16 @@ export function AddResourceModal({
                     <input
                       type="file"
                       accept=".pdf"
-                      required
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                     />
                     <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
-                      {file ? file.name : "Click to upload PDF"}
+                      {file
+                        ? file.name
+                        : initialData
+                        ? "Upload to replace PDF"
+                        : "Click to upload PDF"}
                     </p>
                   </div>
                 </div>
@@ -226,7 +290,11 @@ export function AddResourceModal({
                 className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 flex justify-center items-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {loading ? "Adding..." : "Submit Resource"}
+                {loading
+                  ? "Saving..."
+                  : initialData
+                  ? "Update Resource"
+                  : "Submit Resource"}
               </button>
             </form>
           </motion.div>
