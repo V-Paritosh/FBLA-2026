@@ -34,7 +34,6 @@ interface Project {
   description: string;
   modules: Module[];
   createdAt: Date;
-  // ADD THIS:
   uploads?: {
     _id: string;
     fileName: string;
@@ -233,6 +232,16 @@ export default function ProjectDetailPage() {
                 <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
                   {project.description}
                 </p>
+              </div>
+
+              {/* MOVED: Delete Button placed here on the right */}
+              <div className="md:pt-8">
+                <button
+                  onClick={deleteProject}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-900/30"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete Project
+                </button>
               </div>
             </div>
 
@@ -447,7 +456,7 @@ export default function ProjectDetailPage() {
                 </div>
 
                 {/* Suggested Actions */}
-                <div className="space-y-3">
+                {/* <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                     Recommended
                   </h3>
@@ -462,17 +471,7 @@ export default function ProjectDetailPage() {
                       </p>
                     </div>
                   </div>
-                </div>
-
-                {/* Danger Zone */}
-                <div className="pt-6 border-t border-border">
-                  <button
-                    onClick={deleteProject}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" /> Delete Project
-                  </button>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

@@ -81,7 +81,7 @@ export default function NewProjectPage() {
           <div className="p-6 md:p-12">
             <div className="max-w-3xl mx-auto">
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push("/dashboard")}
                 className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
