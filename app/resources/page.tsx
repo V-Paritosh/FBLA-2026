@@ -74,7 +74,7 @@ export default function ResourcesPage() {
   const [resources, setResources] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "lesson" | "video" | "quiz" | "cheatsheet"
+    "lesson" | "video" | "quizze" | "cheatsheet"
   >("lesson");
 
   // Filters
